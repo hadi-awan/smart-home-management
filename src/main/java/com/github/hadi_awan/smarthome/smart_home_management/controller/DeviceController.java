@@ -40,4 +40,14 @@ public class DeviceController {
     public Device createDevice(@Valid @RequestBody Device device) {
         return deviceService.createDevice(device);
     }
+
+    @PutMapping("/{id}")
+    public Device updateDevice(@PathVariable long id, @Valid @RequestBody Device deviceDetails) {
+        return deviceService.updateDevice(id, deviceDetails);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteDevice(@PathVariable long id) {
+        deviceService.deleteDevice(id);
+    }
 }

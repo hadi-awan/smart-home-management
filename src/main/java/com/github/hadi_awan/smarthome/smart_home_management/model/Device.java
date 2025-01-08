@@ -31,7 +31,7 @@ public class Device {
     @JsonProperty("location")
     private String location;
 
-    @ManyToOne
+    @ManyToOne(cascade = {CascadeType.REMOVE})
     @JoinColumn(name="user_id")
     @JsonProperty("owner")
     private User owner;
