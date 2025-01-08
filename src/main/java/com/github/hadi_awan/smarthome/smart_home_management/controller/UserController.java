@@ -2,6 +2,7 @@ package com.github.hadi_awan.smarthome.smart_home_management.controller;
 
 import com.github.hadi_awan.smarthome.smart_home_management.model.User;
 import com.github.hadi_awan.smarthome.smart_home_management.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +19,15 @@ public class UserController {
         return userService.getAllUsers();
     }
 
-    @PostMapping
-    public User createUser(@RequestBody User user) {
-        return userService.createUser(user);
-    }
-
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id) {
 
         return userService.getUserById(id)
                 .orElseThrow(() -> new RuntimeException("User with id " + id + " not found"));
+    }
+
+    @PostMapping
+    public User createUser(@Valid @RequestBody User user) {
+        return userService.createUser(user);
     }
 }
