@@ -20,6 +20,6 @@ public class UserDetailsServiceConfig implements UserDetailsService {
         if (user == null)
             throw new UsernameNotFoundException("email not found");
 
-        return new User(user);
+        return new User();
     }
 }

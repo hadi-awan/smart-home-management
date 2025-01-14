@@ -18,7 +18,7 @@ public class WebSecurityConfig implements WebMvcConfigurer {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/css/**", "/js/**").permitAll()  // Explicitly allow static resources
-                        .requestMatchers("/signup").permitAll()  // Allow signup page
+                        .requestMatchers("/").permitAll()  // Allow signup page
                         .requestMatchers("/**").permitAll()  // Keep your existing permissions
                 )
                 .formLogin(form -> form

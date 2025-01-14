@@ -1,3 +1,4 @@
+
 package com.github.hadi_awan.smarthome.smart_home_management.service;
 
 import com.github.hadi_awan.smarthome.smart_home_management.model.User;

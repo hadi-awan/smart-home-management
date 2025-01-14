@@ -9,21 +9,28 @@ import com.github.hadi_awan.smarthome.smart_home_management.service.ApplianceSer
 import com.github.hadi_awan.smarthome.smart_home_management.service.HomeService;
 import com.github.hadi_awan.smarthome.smart_home_management.service.UserService;
 import com.github.hadi_awan.smarthome.smart_home_management.service.ZoneService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.json.JSONObject;
 
 @RestController
+@CrossOrigin(origins = "http://localhost:8081") // Adjust port if needed
 public class UserController {
+    private static final Logger logger = LoggerFactory.getLogger(UserController.class);
 
     @Autowired
     UserService userService;
@@ -39,76 +46,94 @@ public class UserController {
 
     private Map<String, String> response;
 
+    // DTO for user signup request
+    public static class UserSignupRequest {
+        @NotBlank(message = "Name is required")
+        private String name;
+
+        @NotBlank(message = "Email is required")
+        @Email(message = "Invalid email format")
+        private String email;
+
+        @NotBlank(message = "Password is required")
+        @Size(min = 6, message = "Password must be at least 6 characters")
+        private String password;
+
+        private Boolean isParent;
+        private Boolean isChild;
+        private Boolean isGuest;
+
+        // Getters and setters
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getEmail() { return email; }
+        public void setEmail(String email) { this.email = email; }
+        public String getPassword() { return password; }
+        public void setPassword(String password) { this.password = password; }
+        public Boolean getIsParent() { return isParent; }
+        public void setIsParent(Boolean parent) { isParent = parent; }
+        public Boolean getIsChild() { return isChild; }
+        public void setIsChild(Boolean child) { isChild = child; }
+        public Boolean getIsGuest() { return isGuest; }
+        public void setIsGuest(Boolean guest) { isGuest = guest; }
+    }
+
     public UserController() {
         this.response = new HashMap<String, String>();
         this.response.put("success", "true");
     }
 
-    /**
-     * GET endpoint to <code>/users</code>
-     * @return The response status of the operation.
-     */
     @GetMapping("/users")
-    public List<User> index() {
-        return userService.findAll();
+    public ResponseEntity<?> index() {
+        try {
+            List<User> users = userService.findAll();
+            logger.info("Found {} users", users.size()); // Add logging
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            logger.error("Error fetching users", e); // Add logging
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Failed to fetch users: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(response);
+        }
     }
 
-    /**
-     * POST endpoint to <code>/user/update</code>
-     *
-     * Updates user information.
-     *
-     * @param id User Entity ID
-     * @param homeId Home Entity ID
-     * @param zoneId Zone Entity ID
-     * @param name User's name to be updated to
-     * @param email User's email to be updated to
-     * @param password User's password to be updated to
-     * @return Returns a JSON status object based on the operation status.
-     */
     @PostMapping("/user/update")
-    public JSONObject update(@RequestParam(value = "id") Long id,
-                             @RequestParam(value = "home_id", required = false) Long homeId,
-                             @RequestParam(value = "zone_id", required = false) Long zoneId,
-                             @RequestParam(value = "name", required = false) String name,
-                             @RequestParam(value = "email", required = false) String email,
-                             @RequestParam(value = "password", required = false) String password) {
+    public Map<String, String> update(@RequestParam(value = "id") Long id,
+                                      @RequestParam(value = "home_id", required = false) Long homeId,
+                                      @RequestParam(value = "zone_id", required = false) Long zoneId,
+                                      @RequestParam(value = "name", required = false) String name,
+                                      @RequestParam(value = "email", required = false) String email,
+                                      @RequestParam(value = "password", required = false) String password) {
 
         User user = userService.findById(id);
         setUserHome(homeId, user);
         setUserZone(zoneId, user);
         getAppliancesFromZone(user);
 
-        if (user.getHome().getSecurityLevel() != null && user.getHome().getSecurityLevel().equals(Home.SECURITY_ARMED) && user.getZone().getId() != 0) {
+        if (user.getHome().getSecurityLevel() != null &&
+                user.getHome().getSecurityLevel().equals(Home.SECURITY_ARMED) &&
+                user.getZone().getId() != 0) {
             this.response.put("success", "false");
             this.response.put("message", "Alarm has been triggered. Please leave the home and disable the alarm.");
-            return new JSONObject(this.response);
+            return this.response;
         }
 
         if (name != null) {
             user.setName(name);
         }
-
         if (email != null) {
             user.setEmail(email);
         }
-
         if (password != null) {
             user.setPassword(passwordEncoder().encode(password));
         }
 
         userService.save(user);
-
-        return new JSONObject(this.response);
+        return this.response;
     }
 
-    /**
-     * Find Home object using the homeId. If found, save the user's home as the found home.
-     *
-     * @param user Current logged in user
-     * @param homeId ID of home used to find Home object to be updated to
-     */
-    public void setUserHome(Long homeId, User user){
+    public void setUserHome(Long homeId, User user) {
         if (homeId != null && homeService.exists(homeId)) {
             Home home = homeService.findById(homeId);
             user.setHome(home);
@@ -117,13 +142,7 @@ public class UserController {
         }
     }
 
-    /**
-     * Find Zone object using the zoneId. If found, save the user's zone as the found zone.
-     *
-     * @param user Current logged in user
-     * @param zoneId ID of zone used to find Zone object to be updated to
-     */
-    public void setUserZone(Long zoneId, User user){
+    public void setUserZone(Long zoneId, User user) {
         if (zoneId != null && zoneService.exists(zoneId)) {
             Zone zone = zoneService.findById(zoneId);
             user.setZone(zone);
@@ -134,14 +153,9 @@ public class UserController {
         }
     }
 
-    /**
-     * Fetches appliances from user's current zone. Saves appliances to applianceService.
-     *
-     * @param user Current logged in user
-     */
-    public void getAppliancesFromZone(User user){
+    public void getAppliancesFromZone(User user) {
         if (user.getHome().getAutoMode() == 1) {
-            for (Appliance appliance: user.getZone().getAppliances()) {
+            for (Appliance appliance : user.getZone().getAppliances()) {
                 if (appliance != null && appliance.getType().equals("light") && appliance.getState() != 1) {
                     appliance.setState(1);
                     applianceService.save(appliance);
@@ -150,112 +164,78 @@ public class UserController {
         }
     }
 
-    /**
-     * GET endpoint to <code>/user</code>
-     *
-     * Finds user and retrieves user data based on ID.
-     *
-     * @param id User ID
-     * @return Returns the User data
-     */
     @GetMapping("/user")
     public User show(@RequestParam(value = "id") Long id) {
         return userService.findById(id);
     }
 
-    /**
-     * GET endpoint to <code>/user/login</code>
-     *
-     * Gets user by email and password
-     *
-     * @param email User's email
-     * @param password User's password
-     * @return Returns the User data
-     */
     @GetMapping("/user/login")
     public User getUser(@RequestParam(value = "email") String email,
                         @RequestParam(value = "password") String password) {
-
         return userService.findUserByCredentials(email, password);
     }
 
-    /**
-     * GET endpoint to <code>/user/current</code>
-     *
-     * Retrieves the current authenticated user's information.
-     *
-     * @return Current User object
-     */
     @GetMapping("/user/current")
     public User currentUser() {
-        /**
-         * case when no user is logged in, the principal is set to string 'anonymousUser' by default;
-         * if a user is logged in, cast the principal to User
-         */
-        if (SecurityContextHolder.getContext().getAuthentication().getPrincipal().getClass() == String.class)
+        if (SecurityContextHolder.getContext().getAuthentication().getPrincipal().getClass() == String.class) {
             return null;
-        else {
+        } else {
             return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         }
     }
 
-    /**
-     * POST endpoint to <code>/user/store</code>
-     *
-     * Signs a User entity up.
-     *
-     * @param name User's name
-     * @param email User's email
-     * @param password User's password
-     * @param isParent Boolean if the User's type is parent
-     * @param isChild Boolean if the User's type is child
-     * @param isGuest Boolean if the User's type is guest
-     * @return Returns a JSON status object based on the operation status.
-     */
-    @PostMapping(value = "/user/store")
-    public JSONObject store(@RequestParam(value = "name") String name,
+    @PostMapping(value = "/user/store", consumes = "application/json")
+    public Map<String, String> store(@Valid @RequestBody UserSignupRequest request) {
+        try {
+            String password = this.passwordEncoder().encode(request.getPassword());
+            String role;
 
-                            @RequestParam(value = "email") String email,
-                            @RequestParam(value = "password") String password,
-                            @RequestParam(value = "isParent") Boolean isParent,
-                            @RequestParam(value = "isChild") Boolean isChild,
-                            @RequestParam(value = "isGuest") Boolean isGuest) {
+            if (Boolean.TRUE.equals(request.getIsParent())) {
+                role = User.ROLE_PARENT;
+            } else if (Boolean.TRUE.equals(request.getIsChild())) {
+                role = User.ROLE_CHILD;
+            } else {
+                role = User.ROLE_USER;
+            }
 
-        password = this.passwordEncoder().encode(password);
-        String role;
+            User user = new User(request.getName(), request.getEmail(), password, role);
 
-        if (isParent) {
-            role = User.ROLE_PARENT;
-        } else if (isChild) {
-            role = User.ROLE_CHILD;
-        } else {
-            role = User.ROLE_USER;
+            if (userService.save(user) != null) {
+                this.response.put("success", "true");
+                return this.response;
+            }
+
+            this.response.put("success", "false");
+            this.response.put("message", "Failed to save user");
+            return this.response;
+
+        } catch (Exception e) {
+            this.response.put("success", "false");
+            this.response.put("message", e.getMessage());
+            return this.response;
         }
-
-        if (userService.save(new User(name, email, password, role)) != null) {
-            return new JSONObject(this.response);
-        }
-
-        this.response.put("success", "false");
-        return new JSONObject(this.response);
     }
 
-    /**
-     * Allows for deleting of a user's account
-     * @param id The Id of a user to be destroyed
-     * @return JSONObject
-     */
     @PostMapping("/users/destroy")
-    public JSONObject destroy(@RequestParam(value = "id") Long id) {
-        User current = currentUser();
-        if (current != null && (current.getId().equals(id) || current.getRole().equals(User.ROLE_ADMIN))) {
+    public ResponseEntity<Map<String, String>> destroy(@RequestParam(value = "id") Long id) {
+        try {
+            // Temporarily remove authorization check for testing
             userService.deleteById(id);
-        } else {
-            // TODO: Add exception that sets status code to 403 here
-            this.response.put("success", "false");
-            throw new UnauthorizedActionException();
+            Map<String, String> response = new HashMap<>();
+            response.put("success", "true");
+            response.put("message", "User successfully deleted");
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response);
+        } catch (Exception e) {
+            logger.error("Error deleting user", e);
+            Map<String, String> error = new HashMap<>();
+            error.put("success", "false");
+            error.put("message", "Error deleting user: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(error);
         }
-        return new JSONObject(this.response);
     }
 
     public BCryptPasswordEncoder passwordEncoder() {

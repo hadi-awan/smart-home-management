@@ -4,6 +4,7 @@ import com.github.hadi_awan.smarthome.smart_home_management.model.Home;
 import com.github.hadi_awan.smarthome.smart_home_management.model.Opening;
 import com.github.hadi_awan.smarthome.smart_home_management.model.User;
 import com.github.hadi_awan.smarthome.smart_home_management.model.Zone;
+import com.github.hadi_awan.smarthome.smart_home_management.repository.UserRepository;
 import com.github.hadi_awan.smarthome.smart_home_management.service.HomeService;
 import com.github.hadi_awan.smarthome.smart_home_management.service.OpeningService;
 import com.github.hadi_awan.smarthome.smart_home_management.service.UserService;
@@ -37,6 +38,8 @@ public class HomeController {
     ZoneService zoneService;
 
     private Map<String, String> response;
+    @Autowired
+    private UserRepository userRepository;
 
     public HomeController() {
         this.response = new HashMap<String, String>();
@@ -122,7 +125,7 @@ public class HomeController {
      * @return boolean, on fail (a user is still present) returns false
      */
     private boolean armAlarm(Home home, String securityLevel) {
-        List<User> users = userService.findAll();
+        List<User> users = (List<User>) userRepository.findAll();
         int state;
 
         if (securityLevel.equals(Home.SECURITY_ARMED)) {

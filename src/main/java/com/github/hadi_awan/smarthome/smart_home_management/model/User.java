@@ -1,5 +1,7 @@
 package com.github.hadi_awan.smarthome.smart_home_management.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,12 +16,14 @@ import java.util.Collections;
 
 @Entity
 @Table(name="users")
-public class User implements UserDetails{
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+public class User implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
+    @Column(nullable = false)
     private String email;
 
     private String name;
@@ -30,28 +34,25 @@ public class User implements UserDetails{
     private String password;
 
     @Column(nullable = false)
-    private String username;  // Add this field
+    private String username;
 
     @Column(nullable = false)
-    private Boolean active = true;  // Set default value here
+    private Boolean active = true;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_id")
+    @JsonIgnoreProperties("users")
     private Home home;
 
-    // If zone is null, user is outside the home they belong to
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "zone_id")
+    @JsonIgnoreProperties("users")
     private Zone zone;
 
     public static final String ROLE_ADMIN = "ROLE_ADMIN";
-
     public static final String ROLE_PARENT = "ROLE_PARENT";
-
     public static final String ROLE_USER = "ROLE_USER";
-
     public static final String ROLE_CHILD = "ROLE_CHILD";
-
     private static final String ROLE_STRANGER = "ROLE_STRANGER";
 
     private transient PropertyChangeSupport support;
@@ -62,40 +63,44 @@ public class User implements UserDetails{
 
     public User(Long id, String name, String email, String password) {
         this.registerObserver();
-
         this.id = id;
         this.email = email;
+        this.username = email;
         this.name = name;
         this.password = password;
         this.role = ROLE_USER;
+        this.active = true;
     }
 
     public User(String name, String email, String password) {
         this.registerObserver();
-
         this.email = email;
+        this.username = email;
         this.name = name;
         this.password = password;
         this.role = ROLE_USER;
+        this.active = true;
     }
 
     public User(String name, String email, String password, String role) {
         this.registerObserver();
-
         this.email = email;
+        this.username = email;
         this.name = name;
         this.password = password;
         this.role = role;
+        this.active = true;
     }
 
     public User(User user) {
         this.registerObserver();
-
         this.email = user.getEmail();
+        this.username = user.getEmail();
         this.password = user.getPassword();
         this.name = user.getName();
         this.id = user.getId();
         this.role = user.getRole();
+        this.active = true;
     }
 
     public void addPropertyChangeListener(PropertyChangeListener pcl) {
@@ -128,6 +133,7 @@ public class User implements UserDetails{
 
     public void setEmail(String email) {
         this.email = email;
+        this.username = email;  // Keep username in sync with email
     }
 
     public String getPassword() {
@@ -161,7 +167,6 @@ public class User implements UserDetails{
             outside.setId(Long.valueOf(0));
             return outside;
         }
-
         return zone;
     }
 
@@ -172,7 +177,11 @@ public class User implements UserDetails{
 
     @Override
     public String getUsername() {
-        return name;
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     @Override
@@ -192,18 +201,18 @@ public class User implements UserDetails{
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
     }
 
     private void registerObserver() {
         this.support = new PropertyChangeSupport(this);
     }
 
+    @JsonIgnore
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         List<GrantedAuthority> list = new ArrayList<GrantedAuthority>();
         list.add(new SimpleGrantedAuthority(this.role));
-
         return list;
     }
 }
