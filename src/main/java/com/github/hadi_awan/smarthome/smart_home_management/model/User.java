@@ -5,13 +5,12 @@ import jakarta.persistence.*;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-
+import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.beans.PropertyChangeListener;
-import java.util.List;
 
 @Entity
 @Table(name="users")
@@ -29,6 +28,12 @@ public class User implements UserDetails{
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
+
+    @Column(nullable = false)
+    private String username;  // Add this field
+
+    @Column(nullable = false)
+    private Boolean active = true;  // Set default value here
 
     @ManyToOne
     @JoinColumn(name = "home_id")
