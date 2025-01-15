@@ -1,5 +1,5 @@
 <template>
-  <v-form @submit.prevent="handleSignup">
+  <v-form @submit.prevent="submitForm">
     <v-text-field
         v-model="name"
         label="Name"
@@ -29,13 +29,15 @@
         v-model="isGuest"
         label="Guest"
     />
-
     <v-btn type="submit" color="primary">Sign Up</v-btn>
   </v-form>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
+  name: 'SignupForm',
   data() {
     return {
       name: '',
@@ -43,33 +45,39 @@ export default {
       password: '',
       isParent: false,
       isChild: false,
-      isGuest: false,
+      isGuest: false
     };
   },
   methods: {
-    handleSignup() {
-      const signupData = {
-        name: this.name,
-        email: this.email,
-        password: this.password,
-        isParent: this.isParent,
-        isChild: this.isChild,
-        isGuest: this.isGuest,
-      };
+    async submitForm() {
+      try {
+        const params = {
+          name: this.name,
+          email: this.email,
+          password: this.password,
+          isParent: this.isParent,
+          isChild: this.isChild,
+          isGuest: this.isGuest
+        };
 
-      console.log("Emitting signup data:", signupData);
+        console.log('Sending signup data:', params);
 
-      // Emit the event to the parent to handle the request
-      this.$emit('signup', signupData);
+        const response = await axios.post('http://localhost:8080/user/store', null, {
+          params: params
+        });
 
-      // Perform the POST request
-      axios.post('http://localhost:8080/user/store', signupData)
-          .then(response => {
-            console.log("User created successfully:", response.data);
-          })
-          .catch(error => {
-            console.error("There was an error creating the user:", error);
-          });
+        console.log('Signup response:', response.data);
+        if (response.data.success === "true") {
+          alert('User created successfully!');
+          // Optionally redirect to login
+          // this.$router.push('/login');
+        } else {
+          alert('Signup failed: ' + (response.data.message || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error during signup:', error);
+        alert('Error during signup: ' + (error.response?.data?.message || error.message));
+      }
     }
   }
 };

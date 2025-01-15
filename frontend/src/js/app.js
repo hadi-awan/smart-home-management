@@ -6,6 +6,8 @@ import '@mdi/font/css/materialdesignicons.css';
 import 'vuetify/dist/vuetify.min.css';
 
 import SignupForm from '../components/Signup.vue';
+import UserList from '../components/UserList.vue';
+import Login from '../components/Login.vue';
 import profile from '../components/Profile';
 import mainpage from '../components/MainPage';
 import modules from '../components/Modules';
@@ -17,7 +19,6 @@ import simulator from '../components/SimulatorModule';
 import editprofile from '../components/Editprofile';
 import edithome from '../components/Edithome';
 import houselayout from '../components/HouseLayout';
-import UserList from '../components/UserList.vue';
 
 // Use VueX and Vuetify
 Vue.use(VueX);
@@ -71,6 +72,8 @@ new Vue({
     store: store,
     components: {
         SignupForm,
+        UserList,
+        Login,
         profile,
         mainpage,
         modules,
@@ -82,7 +85,6 @@ new Vue({
         editprofile,
         edithome,
         houselayout,
-        UserList
     },
     data: {
         name: '',

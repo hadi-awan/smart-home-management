@@ -1,53 +1,138 @@
-
 <template>
-  <div class="login-form">
-    <form @submit.prevent="submitForm()">
-      <h3>Sign In</h3>
+  <v-container class="fill-height" fluid>
+    <v-row align="center" justify="center">
+      <v-col cols="12" sm="8" md="6" lg="4">
+        <v-card class="elevation-12">
+          <v-toolbar color="primary" dark flat>
+            <v-toolbar-title>Login</v-toolbar-title>
+            <v-spacer></v-spacer>
+          </v-toolbar>
+          <v-card-text>
+            <v-form @submit.prevent="submitForm">
+              <v-text-field
+                  v-model="email"
+                  label="Email"
+                  name="email"
+                  prepend-icon="mdi-email"
+                  type="email"
+                  required
+              ></v-text-field>
 
-      <div class="login-box">
-        <label>Email address</label>
-        <input id="email" v-model="email" type="email" />
-      </div>
-
-      <div class="login-box">
-        <label>Password</label>
-        <input id="password" v-model="password" type="password" />
-      </div>
-
-      <button type="submit">Sign In</button>
-    </form>
-    <br />
-  </div>
+              <v-text-field
+                  v-model="password"
+                  label="Password"
+                  name="password"
+                  prepend-icon="mdi-lock"
+                  type="password"
+                  required
+              ></v-text-field>
+            </v-form>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn
+                color="primary"
+                @click="submitForm"
+                :loading="loading"
+            >
+              Login
+            </v-btn>
+          </v-card-actions>
+          <v-snackbar
+              v-model="snackbar"
+              :color="snackbarColor"
+              timeout="3000"
+          >
+            {{ snackbarText }}
+          </v-snackbar>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
-  name: 'login',
+  name: 'Login',
   data() {
     return {
       email: '',
-      password: ''
+      password: '',
+      loading: false,
+      snackbar: false,
+      snackbarText: '',
+      snackbarColor: 'success'
     };
   },
 
   methods: {
-    submitForm() {
-      if (this.isParent === '') this.isParent = false;
-      if (this.isChild === '') this.isChild = false;
-      if (this.isGuest === '') this.isGuest = false;
+    async submitForm() {
+      if (!this.email || !this.password) {
+        this.showError('Please fill in all fields');
+        return;
+      }
 
-      const path = `/user/store?name=${encodeURIComponent(this.name)}&email=${encodeURIComponent(this.email)}&password=${encodeURIComponent(this.password)}&isParent=${this.isParent}&isChild=${this.isChild}&isGuest=${this.isGuest}&active=true`;
+      this.loading = true;
 
-      axios.post(path)
-          .then(response => {
-            console.log(response);
-            window.location.href = '/';
-          })
-          .catch(error => {
-            console.error(error);
-            alert('Signup failed. Please try again.');
-          });
+      try {
+        // Create form data to match backend's @RequestParam expectation
+        const formData = new URLSearchParams();
+        formData.append('email', this.email);
+        formData.append('password', this.password);
+
+        const response = await axios.get(`http://localhost:8080/user/login?${formData.toString()}`, {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        });
+
+        console.log('Login response:', response.data); // Add this for debugging
+
+        if (response.data) {
+          // Check if we got a user object back (successful login)
+          if (response.data.id) {
+            this.showSuccess('Login successful!');
+            localStorage.setItem('user', JSON.stringify(response.data));
+            this.$router.push('/');
+          } else if (response.data.success === "false") {
+            this.showError(response.data.message || 'Login failed');
+          } else {
+            this.showError('Invalid credentials');
+          }
+        } else {
+          this.showError('Invalid credentials');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        if (error.response) {
+          console.log('Error response:', error.response.data); // Add this for debugging
+        }
+        const errorMessage = error.response?.data?.message || 'Login failed. Please try again.';
+        this.showError(errorMessage);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    showSuccess(text) {
+      this.snackbarText = text;
+      this.snackbarColor = 'success';
+      this.snackbar = true;
+    },
+
+    showError(text) {
+      this.snackbarText = text;
+      this.snackbarColor = 'error';
+      this.snackbar = true;
     }
   }
 };
 </script>
+
+<style scoped>
+.fill-height {
+  min-height: calc(100vh - 64px);
+}
+</style>

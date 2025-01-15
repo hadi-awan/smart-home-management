@@ -30,6 +30,7 @@ public class User implements UserDetails {
 
     private String role;
 
+    @Column(nullable = false)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 

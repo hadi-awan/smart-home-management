@@ -3,6 +3,8 @@ package com.github.hadi_awan.smarthome.smart_home_management.service;
 
 import com.github.hadi_awan.smarthome.smart_home_management.model.User;
 import com.github.hadi_awan.smarthome.smart_home_management.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.util.List;
 
 @Service
 public class UserService {
+    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
 
     @Autowired
     UserRepository repository;
@@ -29,7 +32,13 @@ public class UserService {
     }
 
     public User findByEmail(String email) {
-        return repository.findByEmail(email);
+        User user = repository.findByEmail(email);
+        if (user != null) {
+            logger.info("Found user with email: {}", email);
+            logger.info("Password present: {}", user.getPassword() != null);
+            logger.info("Password value: {}", user.getPassword());
+        }
+        return user;
     }
 
     public User save(User user) {
@@ -46,11 +55,24 @@ public class UserService {
     }
 
     public User findUserByCredentials(String email, String password) {
+        logger.info("Attempting to find user with email: {}", email);
         User potentialUser = repository.findByEmail(email);
-        if (potentialUser != null && new BCryptPasswordEncoder().matches(password, potentialUser.getPassword())) {
-            return potentialUser;
+
+        if (potentialUser != null) {
+            logger.info("Found user with email: {}", email);
+            logger.info("Stored password hash: {}", potentialUser.getPassword());
+
+            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+            boolean passwordMatches = encoder.matches(password, potentialUser.getPassword());
+            logger.info("Password match result: {}", passwordMatches);
+
+            if (passwordMatches) {
+                return potentialUser;
+            }
         } else {
-            return null;
+            logger.info("No user found with email: {}", email);
         }
+
+        return null;
     }
 }

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:8081") // Adjust port if needed
@@ -170,9 +171,58 @@ public class UserController {
     }
 
     @GetMapping("/user/login")
-    public User getUser(@RequestParam(value = "email") String email,
-                        @RequestParam(value = "password") String password) {
-        return userService.findUserByCredentials(email, password);
+    public ResponseEntity<?> getUser(@RequestParam(value = "email") String email,
+                                     @RequestParam(value = "password") String password) {
+        logger.info("Login attempt for: {}", email);
+        User user = userService.findUserByCredentials(email, password);
+
+        if (user != null) {
+            return ResponseEntity.ok(user);
+        } else {
+            Map<String, String> response = new HashMap<>();
+            response.put("success", "false");
+            response.put("message", "Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+    }
+
+    @GetMapping("/check-users")
+    public ResponseEntity<?> checkUsers() {
+        try {
+            List<User> users = userService.findAll();
+            List<Map<String, String>> userInfo = new ArrayList<>();
+
+            for (User user : users) {
+                Map<String, String> info = new HashMap<>();
+                info.put("id", String.valueOf(user.getId()));
+                info.put("email", user.getEmail());
+                info.put("name", user.getName());
+                info.put("hasPassword", user.getPassword() != null ? "yes" : "no");
+                info.put("passwordLength", user.getPassword() != null ? String.valueOf(user.getPassword().length()) : "0");
+                userInfo.add(info);
+            }
+
+            return ResponseEntity.ok(userInfo);
+        } catch (Exception e) {
+            logger.error("Error checking users", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error checking users: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/debug/user")
+    public ResponseEntity<?> debugUser(@RequestParam String email) {
+        User user = userService.findByEmail(email);
+        if (user != null) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("id", user.getId());
+            info.put("email", user.getEmail());
+            info.put("name", user.getName());
+            info.put("passwordHash", user.getPassword());
+            info.put("role", user.getRole());
+            return ResponseEntity.ok(info);
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @GetMapping("/user/current")
@@ -184,35 +234,47 @@ public class UserController {
         }
     }
 
-    @PostMapping(value = "/user/store", consumes = "application/json")
-    public Map<String, String> store(@Valid @RequestBody UserSignupRequest request) {
+    @PostMapping(value = "/user/store")
+    public ResponseEntity<?> store(@RequestParam(value = "name") String name,
+                                   @RequestParam(value = "email") String email,
+                                   @RequestParam(value = "password") String password,
+                                   @RequestParam(value = "isParent") Boolean isParent,
+                                   @RequestParam(value = "isChild") Boolean isChild,
+                                   @RequestParam(value = "isGuest") Boolean isGuest) {
         try {
-            String password = this.passwordEncoder().encode(request.getPassword());
-            String role;
+            String encodedPassword = passwordEncoder().encode(password);
+            logger.info("Storing user with email: {}", email);
+            logger.info("Encoded password hash: {}", encodedPassword);
 
-            if (Boolean.TRUE.equals(request.getIsParent())) {
+            String role;
+            if (isParent) {
                 role = User.ROLE_PARENT;
-            } else if (Boolean.TRUE.equals(request.getIsChild())) {
+            } else if (isChild) {
                 role = User.ROLE_CHILD;
             } else {
                 role = User.ROLE_USER;
             }
 
-            User user = new User(request.getName(), request.getEmail(), password, role);
+            User user = new User(name, email, encodedPassword, role); // Note: passing encoded password
+            user.setUsername(email); // Ensure username is set
+            user = userService.save(user);
 
-            if (userService.save(user) != null) {
-                this.response.put("success", "true");
-                return this.response;
-            }
+            // Log saved user details
+            logger.info("Saved user ID: {}", user.getId());
+            logger.info("Saved password present: {}", user.getPassword() != null);
+            logger.info("Saved password hash: {}", user.getPassword());
 
-            this.response.put("success", "false");
-            this.response.put("message", "Failed to save user");
-            return this.response;
+            Map<String, String> response = new HashMap<>();
+            response.put("success", "true");
+            response.put("message", "User created successfully");
 
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            this.response.put("success", "false");
-            this.response.put("message", e.getMessage());
-            return this.response;
+            logger.error("Error creating user", e);
+            Map<String, String> response = new HashMap<>();
+            response.put("success", "false");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -235,6 +297,58 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(error);
+        }
+    }
+
+    @PostMapping("/user/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestParam String email, @RequestParam String newPassword) {
+        try {
+            User user = userService.findByEmail(email);
+            if (user != null) {
+                user.setPassword(passwordEncoder().encode(newPassword));
+                userService.save(user);
+
+                Map<String, String> response = new HashMap<>();
+                response.put("success", "true");
+                response.put("message", "Password updated successfully");
+                return ResponseEntity.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(response);
+            } else {
+                Map<String, String> response = new HashMap<>();
+                response.put("success", "false");
+                response.put("message", "User not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(response);
+            }
+        } catch (Exception e) {
+            logger.error("Error resetting password", e);
+            Map<String, String> response = new HashMap<>();
+            response.put("success", "false");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(response);
+        }
+    }
+
+    @GetMapping("/debug/user-details")
+    public ResponseEntity<?> debugUserDetails(@RequestParam String email) {
+        try {
+            User user = userService.findByEmail(email);
+            if (user != null) {
+                Map<String, Object> details = new HashMap<>();
+                details.put("id", user.getId());
+                details.put("email", user.getEmail());
+                details.put("hasPassword", user.getPassword() != null);
+                details.put("passwordHash", user.getPassword()); // For debugging only!
+                return ResponseEntity.ok(details);
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            logger.error("Error getting user details", e);
+            return ResponseEntity.internalServerError().body(e.getMessage());
         }
     }
 
